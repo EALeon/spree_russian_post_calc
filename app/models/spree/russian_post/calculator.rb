@@ -1,6 +1,6 @@
 # coding: UTF-8
 
-class Spree::RussianPost::Calculator < Spree::Calculator
+class Spree::RussianPost::Calculator < Spree::ShippingCalculator
   include RussianPostCalc
 
   # Post code of the sender.
@@ -20,20 +20,18 @@ class Spree::RussianPost::Calculator < Spree::Calculator
     I18n.t(:russian_post_description)
   end
 
-  def compute(object=nil)
-    weight = compute_weight(object)
-
+  def compute(object = nil, options = {})
     # Get order from the object.
-    order = object.is_a?(::Spree::Order) ? object : object.order
+    order  = object.is_a?(::Spree::Order) ? object : object.order
+    weight = compute_weight(order)
 
-    declared_value = if preferred_use_declared_value
-                       object.line_items.map(&:amount).sum
-                     else
-                       0
-                     end
+    declared_value = preferred_use_declared_value ? order.line_items.map(&:amount).sum : 0
+
+    sender_post_code     = preferred_sender_post_code
+    ship_address_zipcode = options[:ship_address_zipcode] || order.ship_address.zipcode
 
     # Calculate delivery price itself.
-    calculate_price preferred_sender_post_code, order.ship_address.zipcode, weight, declared_value
+    calculate_price sender_post_code, ship_address_zipcode, weight, declared_value
   end
 
   # Computes weight for the given order.
@@ -58,16 +56,5 @@ class Spree::RussianPost::Calculator < Spree::Calculator
              end
 
     self.class.calculate_delivery_price sender_post_code, destination_post_code, weight, declared_value
-  end
-
-  class << self
-    include ::FlexyCache
-
-    flexy_cache :calculate_delivery_price,
-                :cache_key_condition => Proc.new { |*args| args.join("/") },
-                :expire_on           => Proc.new { |object| Time.now + 2.weeks },
-                :retry_in            => Proc.new { |object| Time.now + 2.hours },
-                :error_result        => Proc.new { |result, object| result.blank? },
-                :catch_exceptions    => Net::HTTPExceptions
   end
 end
