@@ -28,11 +28,14 @@ class Spree::RussianPost::Calculator < Spree::ShippingCalculator
     declared_value = preferred_use_declared_value ? order.line_items.map(&:amount).sum : 0
 
     sender_post_code     = preferred_sender_post_code
-    ship_address_zipcode = options[:ship_address_zipcode] || order.ship_address.zipcode
+    ship_address_zipcode = options[:ship_address_zipcode]
+    ship_address_zipcode ||= order.shipments.present? ? order.ship_address.zipcode : sender_post_code
 
     # Calculate delivery price itself.
     calculate_price sender_post_code, ship_address_zipcode, weight, declared_value
   end
+
+  alias_method :compute_package, :compute
 
   # Computes weight for the given order.
   #
